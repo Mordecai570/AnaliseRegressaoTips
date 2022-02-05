@@ -1,0 +1,394 @@
+---
+title: "Projeto 2"
+author: "Gabriel Victor Soares dos Santos"
+date: "19/11/2021"
+output:
+  pdf_document: 
+    latex_engine: xelatex 
+---
+
+```{r library, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Primeiro baixamos todas as bibliotecas
+#install.packages("ggplot2")
+#install.packages("ggthemes")
+#install.packages("dplyr")
+#install.packages("knitr")
+#install.packages("kableExtra")
+#install.packages("psych")
+#install.packages("GGally")
+#install.packages("car")
+#install.packages("reshape2")
+#install.packages(tidyverse)
+#install.packages("gridExtra")
+#install.packages("bestglm")
+
+# Depois chamamos as bibliotecas necessárias para o programa
+library(ggplot2)
+library(ggthemes)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(psych)
+library(GGally)
+library(car)
+library(reshape2)
+library(tidyverse)
+library(gridExtra)
+library(bestglm)
+df <- tips 
+```
+
+
+\section{1. Introdução}
+
+Este trabalho tem como objetivo a aplicação de técnicas estatísticas fazendo análises descritivas, exploratórias e inferenciais sobre um modelo de regressão linear múltipla. Além de servir como método avaliativo para a matéria \textbf{ME613} - Análise de Regressão da Universidade Estadual de Campinas.
+
+A gorjeta, pela definição do dicionário Michaelis, é uma pequena quantidade de dinheiro com que se gratifica um serviço além do preço estipulado, e é normalmente dada em bares, restaurantes, hotéis, entre outros estabelecimentos. Essa quantidade monetária varia dependendo da satisfação do cliente atendido, entretanto, por compor uma parte significativa dos salários desses trabalhadores, a porcentagem mínima de gorjeta é regulada de acordo com as leis trabalhistas de cada país. Nos Estados Unidos, por exemplo, é habitual calcular a parte e dar 15% do valor da conta, enquanto em outros países a gojeta é inclusa na conta na forma de uma \textit{"taxa de serviços"}, como no Brasil onde a taxa é de 10%. Existem também países cujo o ato de dar gorjeta é considerado desrespeitoso e mal visto.   
+
+Dentre os bancos de dados disponíveis, foi escolhido "\textit{tips}", um conjunto de dados coletados sobre as gorjetas recebidas, no começo dos anos 1990, por um garçom de um restaurante no Estados Unidos. Analisaremos as informações coletadas a respeito dos clientes que frequentaram esse restaurante e criaremos um modelo de regressão múltipla para a predição das gorjetas. 
+
+\section{2. Metodologia}
+
+Este banco de dados apresenta 7 variáveis diferentes sendo elas a gorjeta recebida, o total da conta, o gênero do(a) cliente pagante, se é fumante, o dia frequentado entre quinta-feira e domingo, período do dia, nesse caso almoço ou janta, e tamanho do grupo por mesa atendida. Criou-se a variável razão que é a proporção da gorjeta em relação ao total da conta. 
+
+Para obter os resultados e respostas acerca da problematização apresentada neste trabalho, será feita a análise do conjunto de dados sumarizando informações relevantes em tabelas e gráficos, e por último a criação e refinamento do modelo de regressão múltipla adequado. O trabalho transcorrerá a partir o conteúdo ensinado em aula do quais, que dentre os métodos apresentados, utilizou-se o critério de análise de variância (ANOVA) e \textit{Backward Elimination} para a seleção das variáveis preditoras, a um nível de significancia de 5%. Já para a testagem dos coeficientes optou-se por analisa-los a um nível de 1%.
+
+Neste trabalho é utilizada a linguagem de programação R e o programa \textit{RStudio} para os testes, cálculos e criação das tabelas e gráficos. 
+
+
+\section{3. Descrição Dados}
+
+O conjunto é composto de 7 variáveis, com 244 observações ao todo sendo a maioria das variáveis classificadas como categóricas, com respostas de 2 a 4 níveis, ou seja, há 2 ou 4 tipos de resposta para cada variável. A Tabela 1 apresenta as medidas sumárias das variáveis numéricas, a Tabela 2 é uma tabela de contingência sobre o gênero dos clientes e se são fumantes e a Tabela 3 mostra a quantidade de clientes ao longo do dia pelos dias da semana. 
+
+```{r arrumando os dados, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Arrumamos os dados para melhor trabalharmos com eles 
+
+df$sex <- gsub('Female', 'Feminino', df$sex)
+df$sex <- gsub('Male', 'Masculino', df$sex)
+df$smoker <- gsub('Yes', 'Sim', df$smoker)
+df$smoker <- gsub('No', 'Não', df$smoker)
+df$day <- gsub('Sun', 'Domingo', df$day)
+df$day <- gsub('Sat', 'Sábado', df$day)
+df$day <- gsub('Thur', 'Quinta', df$day)
+df$day <- gsub('Fri', 'Sexta', df$day)
+df$time <- gsub('Lunch', 'Almoço', df$time)
+df$time <- gsub('Dinner', 'Janta', df$time)
+
+cbind(df, "rate")
+df$rate = df$tip/df$total_bill
+```
+
+```{r tabela1, echo=FALSE, message=FALSE, warning=FALSE}
+# Criação da tabela 1, em relação a conta e a gorjeta
+
+t1 <- df %>% select("Total da Conta" = total_bill, "Gorjeta" = tip, "Tamanho do Grupo" = size) %>% describe() %>% select("Média" = mean, "Desvio Padrão" = sd, "Valor Mínimo" = min, "Valor Máximo" = max)
+t1 <- round(t1,digits=2)
+knitr::kable(list(t1), booktabs = TRUE, valign = 't',caption = "Médias e Desvios Padrões das Variáveis Numéricas") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+Podemos ver na Tabela 1 que os clientes que frequentaram o restaurante iam em pares, ou trios, e a média do total das contas é de 19.79 dólares, o que dada a taxa de 15% da seção 1, é proporcional a média de gorjetas de 3 dólares.
+
+
+```{r tabela2, echo=FALSE, message=FALSE, warning=FALSE}
+# Criação da tabelas quantitativas, em relação ao gêneros dos participantes
+
+#t2 <-  df %>% 
+#  group_by(sex, smoker) %>% 
+#  tally() %>% 
+#  spread(key = smoker, value = n)
+
+#colnames(t2) <- c("Gênero/Fumante","Não", "Sim", "Total")
+#table2 <- prop.table(table(df$sex, df$smoker), margin=2)
+
+Sim <- c(33,60,93)
+Nao <- c(54,97,151)
+Total <- c(87,157,244)
+Sex <- c("Feminino", "Masculino", "Total")
+
+table2 <- data.frame(Sex,Sim,Nao,Total)
+colnames(table2) <- c("Gênero/Fumante","Não", "Sim", "Total")
+
+knitr::kable(list(table2), booktabs = TRUE, valign = 't',caption = "Gênero do Pagante e se o Grupo é Fumante") %>% kable_styling(latex_options = "HOLD_position")
+```
+Sobre a Tabela 2, 64% (157) dos clientes que pagaram a conta foram os homens. Em relação ao fumo, 61% (151) dos clientes fumavam, desses 64% (97) eram homens e os outros 36% (54) mulheres.
+
+
+```{r tabela3, echo=FALSE, message=FALSE, warning=FALSE}
+# Criação da tabelas quantitativas, em relação ao período e dia da semana
+#t3 <-  df %>% 
+#  group_by(day, time) %>% 
+#  tally() %>% 
+#  spread(key = day, value = n)
+
+Quinta <- c(61,1,62)
+Sexta <- c(7, 12, 19)
+Sabado <- c(0, 87, 87)
+Domingo <- c(0,76,76)
+Total <- c(68,176,244)
+Horario <- c("Almoço", "Janta", "Total")
+
+table3 <- data.frame(Horario,Quinta,Sexta,Sabado,Domingo,Total)
+colnames(table3) <- c("Período/Dia","Quinta", "Sexta", "Sábado", "Domingo", "Total")
+
+knitr::kable(list(table3), booktabs = TRUE, valign = 't',caption = "Quantidade de mesas atendidas ao longo do dia pelos dias da semana") %>% kable_styling(latex_options = "HOLD_position")
+```
+Na Tabela 3 temos que os almoços representam apenas 27% do total observado, indicando que os clientes preferem jantar no restaurante. Os dias preferidos são sábados e domingos com uma frequencia apresentada de 66%. 
+
+
+
+\section{4. Análise exploratória}
+
+Usando a Correlação de Pearson é possível quantificar a correlação entre as variáveis, além de determinar se as variáveis são direta, ou inversamente, proporcionais.
+
+```{r correlação, echo=FALSE, message=FALSE, warning=FALSE}
+plot_corr <- df %>% select("Total bill" = total_bill,"Tips" = tip, "Size" = size)
+ggpairs(plot_corr) +
+  ggtitle("Correlação Entre as Variáveis Quantitativas") + 
+theme_tufte()
+```
+
+Segundo o gráfico a menor correlação foi de 48%, entre a variável resposta e a variável Tamanho do Grupo, podendo classificar essa relação como sendo moderadamente positiva. A maior correlação foi de 67% entre a variável Gorjeta e Total da Conta, podendo considera-la uma correlação fortemente positiva. 
+
+Destaca-se a seguir alguns gráficos que podem nos indicar visualmente um pouco do que foi apresentado no gráfico de Correlação e nas tabelas da seção 2. 
+
+```{r plots, echo=FALSE, message=FALSE, warning=FALSE}
+plot_sex <- ggplot(df, aes(sex, tip), add=TRUE) + 
+  geom_boxplot() +
+  xlab("Gênero dos Participantes") +
+  ylab("Gorjeta") +
+  labs(caption = "Gráfico 1") + 
+theme_tufte()
+
+plot1 <- ggplot(df, aes(x = total_bill, y = tip)) +
+  geom_point(aes(group = sex, colour = sex)) +
+  xlab("Total da Conta") +
+  ylab("Gorjeta") +
+  labs(caption = "Gráfico 2") + 
+theme_tufte()
+
+
+plot_time <- ggplot(df, aes(time, tip), add=TRUE) + 
+  geom_boxplot() +
+  xlab("Período") +
+  ylab("Gorjeta") +
+  labs(caption = "Gráfico 3") + 
+theme_tufte()
+
+plot2 <- ggplot(df, aes(x = total_bill, y = tip)) +
+  geom_point(aes(group = time, colour = time)) +
+  xlab("Total da Conta") +
+  ylab("Gorjeta") +
+  labs(caption = "Gráfico 4") + 
+theme_tufte()
+
+
+plot_scatter <- grid.arrange(plot_sex, plot1, plot_time, plot2, nrow = 2)
+```
+
+No gráfico de boxplot 1, a diferença da média de gorjeta é mínima. Seguindo a taxa de 15% de gorjeta, pode indicar uma qualidade estável no atendimento prestado pelo garçom. Entretanto no grafico de boxplot 2, a janta apresenta uma média muito maior de gorjetas dadas, já que,  como visto na Tabela 3 da seção 2, os clientes frequentavam mais o restaurante no período da noite. 
+
+
+```{r plots2, echo=FALSE, message=FALSE, warning=FALSE}
+
+plot_dia <- ggplot(df, aes(day, tip), add=TRUE) + 
+  geom_boxplot() +
+  xlab("Dia da Semana") +
+  ylab("Gorjeta") +
+  labs(caption = "Gráfico 5") + 
+theme_tufte()
+
+plot3 <- ggplot(df, aes(x = total_bill, y = tip)) +
+  geom_point(aes(group = day, colour = day)) +
+  xlab("Total da Conta") +
+  ylab("Gorjeta") +
+  labs(caption = "Gráfico 6") + 
+theme_tufte()
+
+plot4 <- ggplot(df, aes(x=rate)) + 
+  geom_histogram(col="black", fill="blue", alpha = .2) + 
+  labs(x="Razão", y="Frequência", caption="Gráfico 8") + 
+theme_tufte()
+
+plot5 <- ggplot(df, aes(x=tip)) + 
+  geom_histogram(col="black",fill="blue", alpha = .2) + 
+  labs(x="Gorjeta", y="Frequência", caption="Gráfico 8") + 
+theme_tufte()
+
+plot_scatter_2 <- grid.arrange(plot_dia, plot3, plot4, plot5, nrow = 2)
+```
+
+No gráfico de boxplot 3, sábado apresenta mais outliers que os outros dias, domingo a média de gorjetas foi maior, enquanto quinta-feira a média foi inferior a 2 dólares e meio. No gráfico 8, vemos que a proporção de gorjetas dadas tem média 16%, e que pelo gráfico 8 as gorjetas mais frequentes são de 2 e 3 dólares. 
+
+
+\section{5. Analise Inferencial}
+
+O modelo de regressão utilizado nesse trabalho será:
+
+
+\begin{equation}
+Y_i = \beta_0 + \beta_1 X_{i1 }+ \beta_2 X_{i2} + ... + \beta_{p-1} X_{i,p-1} + \epsilon_i
+\end{equation}
+
+, onde:
+
+\begin{itemize}
+  \item $\beta_0,\beta_1,...,\beta_{p-1}$ são parâmetros.
+  \item $X_{i1 },...,X_{i,p-1 }$ são constantes conhecidas.
+  \item $\epsilon_i \overset{iid}{\sim}  \mathcal{N}(0,\sigma^2)$.
+  \item $i = 1,2,...,n $.
+\end{itemize}
+
+\subsection{5.1 Modelagem estatística}
+
+Serão construídos modelos de regressão multipla entre as variáveis resposta, neste caso Gorjeta, e as demais variáveis, como descrito na seção 2, avaliaremos primeiro a Análise de Variância (ANOVA) para encontrar se há diferença entre a distribuição das variáveis, a um nível de significancia de 5%. 
+
+Se o modelo for adequado, verificaremos então a normalidade pelo Teste de Shapiro-Wilks, heterocedasticidade pelo Teste de Breusch-Pagan, a um nível de significancia de 1%.
+
+```{r plot, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+df <- tips 
+```
+
+
+```{r modelos, echo=FALSE, message=FALSE, warning=FALSE}
+modelo <- lm(tip ~ total_bill + sex + smoker + day + time + size, df)
+a <- summary(modelo)
+
+
+names(modelo$coefficients) <- c('Intercepto','Total da Conta','Gênero','Fumante','Sábado', 'Domingo','Quinta','Período','Tamanho do Grupo')
+kable(coef(modelo), booktabs = TRUE, valign = 't',caption = "Coeficientes do Modelo") %>% kable_styling(latex_options = "HOLD_position")
+
+
+tabela_a <- data.frame(c("Total Conta", "Gênero", "Fumante", "Sábado","Domingo","Quinta", "Período Almoço", "Tamanho do Grupo"),c("<2e-16","0.8190","0.5561","0.6953","0.9369","0.6804","0.8783","0.0500"),c("Sucesso","Fracasso","Fracasso","Fracasso","Fracasso","Fracasso","Fracasso","Sucesso"))
+colnames(tabela_a) <- c("Teste ANOVA","p-valor","Resultado Significativo")
+kable(tabela_a, booktabs = TRUE, valign = 't') %>% kable_styling(latex_options = "HOLD_position")
+```
+
+Com base na análise de variância e usando o método de \textit{Backward Elimination}, dentre o modelo atual as variáveis significativas para a regressão são o Total da Conta e o Tamanho do Grupo.
+
+Portanto, a equação fica da seguinte maneira:
+
+\begin{equation}
+Y_i = \beta_0 + \beta_1 X_{1} + \beta_2 X_{2} + \epsilon_i
+\end{equation}
+as variáveis do modelo são:
+
+\begin{itemize}
+  \item $X_1 = \mbox{Total da Conta} 
+$
+  \item $X_2 = \mbox{Tamanho do Grupo}
+$
+\end{itemize}
+
+Dos quais apresentam os seguintes coeficientes:
+
+\begin{equation}
+Y_i = 0.6689 + 0.0927 X_{1} + 0.1925 X_{2} + \epsilon_i
+\end{equation}
+
+Tendo um modelo aceitável por ANOVA, procediremos para os testes de normalidade e heterocedasticidade.
+
+```{r plot regressao, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+modelo2 <- lm(tip ~ total_bill + size, df)
+coef_modelo2 <- coef(modelo2); coef_modelo2
+b <- summary(modelo2)
+```
+
+\subsection{5.2 Teste de Shapiro-Wilks e Teste de Breusch-Pagan}
+
+O Teste de Shapiro-Wilks, que busca analisar a normalidade dos resíduos, tem como critério de decisão o p-valor for inferior a 0.01, o modelo será considerado um sucesso.
+
+```{r teste de normalidade, echo=FALSE, message=FALSE, warning=FALSE}
+shapiro_m2 <- shapiro.test(residuals(modelo2))
+tabela_shapiro_1 <- data.frame(c("Modelo"), c(shapiro_m2$p.value), c("Fracasso"))
+colnames(tabela_shapiro_1) <- c("Teste de Shapiro-Wilks","p-valor","Resultado")
+kable(tabela_shapiro_1, booktabs = TRUE, valign = 't') %>% kable_styling(latex_options = "HOLD_position")
+```
+
+Enquanto o Teste de Breusch-Pagan busca analisar a dispersão dos dados, também tendo como critério de decisão o p-valor for inferior a 0.01 para ser considerado um sucesso.
+
+```{r teste de heterocedasticidade, echo=FALSE, message=FALSE, warning=FALSE}
+breusch_m2 <- ncvTest(modelo2)
+tabela_breusch_1 <- data.frame(c("Modelo"), c("< 2.22e-16"), c("Fracasso"))
+colnames(tabela_breusch_1) <- c("Teste de Breusch-Pagan","p-valor","Resultado")
+kable(tabela_breusch_1, booktabs = TRUE, valign = 't') %>% kable_styling(latex_options = "HOLD_position")
+```
+
+Esse modelo não é adequado para descrever a relação entre a variável resposta e as possíveis variáveis preditoras. 
+
+\subsection{5.3 Remodelando}
+
+Usando o procedimento de \textit{Box-Cox}, determinamos o poder de tranformação apropriado para a variável Y, obtendo o valor de $λ = 0.1237$. Então criamos um novo modelo após a transformação e testamos a análise de variância. 
+
+```{r, sei la, echo=FALSE, message=FALSE, warning=FALSE}
+lambda <- powerTransform(modelo)
+
+tips2 <- bcPower(df$tip, lambda$lambda)
+modelo3 <- lm(tips2 ~ total_bill + sex + smoker + day + time + size, df)
+c <- summary(modelo3)
+
+
+tabela_c <- data.frame(c("Total Conta", "Gênero", "Fumante", "Sábado","Domingo","Quinta", "Período Almoço", "Tamanho do Grupo"),c("<2e-16","0.6912","0.6903","0.5020","0.9467","0.6784","0.9318","0.0426"),c("Sucesso","Fracasso","Fracasso","Fracasso","Fracasso","Fracasso","Fracasso","Sucesso"))
+colnames(tabela_c) <- c("Teste ANOVA","p-valor","Resultado Significativo")
+kable(tabela_c, booktabs = TRUE, valign = 't') %>% kable_styling(latex_options = "HOLD_position")
+```
+
+Usando outra vez ANOVA e o método de \textit{Backward Elimination}, temos que do modelo atual as variáveis significativas para a regressão novamente são o Total da Conta e o Tamanho do Grupo. Tendo um modelo aceitável por ANOVA, procediremos para os testes de normalidade e heterocedasticidade.
+
+\subsection{5.4 Teste de Shapiro-Wilks e Teste de Breusch-Pagan}
+
+```{r modelo final, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+modelo4 <- lm(tips2 ~ total_bill + size, df)
+coef_modelo4 <- coef(modelo4); coef_modelo4
+```
+
+
+```{r sei la2, echo=FALSE, message=FALSE, warning=FALSE}
+breusch_m3 <- ncvTest(modelo4)
+shapiro_m3 <- shapiro.test(residuals(modelo4))
+
+tabela_breusch_2 <- data.frame(c("Modelo"), c(breusch_m3$p), c("Sucesso"))
+colnames(tabela_breusch_2) <- c("Teste de Breusch-Pagan","p-valor","Resultado")
+kable(tabela_breusch_2, booktabs = TRUE, valign = 't') %>% kable_styling(latex_options = "HOLD_position")
+
+tabela_shapiro_2 <- data.frame(c("Modelo"), c(shapiro_m3$p.value), c("Sucesso"))
+colnames(tabela_shapiro_2) <- c("Teste de Shapiro-Wilks","p-valor","Resultado")
+kable(tabela_shapiro_2, booktabs = TRUE, valign = 't') %>% kable_styling(latex_options = "HOLD_position")
+
+```
+
+o p-valor do teste desse modelo é inferior a 0.01. Portanto não há diferença entre a distribuição dessas variáveis. Como o modelo atendeu a todas as exigências propostas o usaremos como modelo válido para a nossa análise, que apresenta $R^2$ em um valor de 0.4512, $R^2$ ajustado no valor de 0,4326, uma estatística
+F de 24,16 com 8 e 235 graus de liberdade, além de um p-valor menor que $2.2e^{-16}$, obtendo assim a seguinte equação:
+
+\begin{equation}
+Y_i = 0.2593 + 0.0318 X_{1} + 0.0744 X_{2} + \epsilon_i
+\end{equation}
+onde as variáveis do modelo são:
+
+\begin{itemize}
+  \item $X_1 = \mbox{Total da Conta} 
+$
+  \item $X_2 = \mbox{Tamanho do Grupo}
+$
+\end{itemize}
+
+Uma vez analisados os elementos que compóem a equação, temos a seguir um gráfico de resíduos do modelo selecionado: 
+
+```{r teste de erros independentes, echo=FALSE, message=FALSE, warning=FALSE}
+residualPlot(modelo4)
+```
+
+
+\section{6. Conclusão}
+
+Ao interpretar o modelo, percebemos que menos variáveis realmente influenciam o valor da gorjeta. Por exemplo, pelo que vimos nos gráficos da seção 4, nem o dia da semana e nem o período do dia foram variáveis preditoras no modelo final, mesmo se considerarmos que as pessoas frequentam mais restaurantes nas noites de sexta, ou sábado. Através da analise dos dados aqui apresentados fica evidente que a gorjeta recebida tem apenas relação com total da conta e o tamanho do grupo.
+
+Lembrando que essas estatísticas são baseadas nos dados coletados, talvez com uma amostra maior mais variáveis  poderiam ser mais relevantes e seria necessário um novo modelo de regressão.
+\clearpage
+
+
+\section{7. Bibliografia}
+
+RISCO. In: MICHAELIS: moderno dicionário da língua portuguesa. São Paulo:
+Companhia Melhoramentos, 1998-(Dicionários Michaelis). Disponível em: <https://michaelis.uol.com.br/moderno-portugues/busca/portugues-brasileiro/gorjeta/>. Acesso em: 18, nov. 2021.
+
+KUTNER, M. H., NACHTSHEIM, C., NETER, J., & LI, W. (2005). Applied Linear Statistical Models. 
